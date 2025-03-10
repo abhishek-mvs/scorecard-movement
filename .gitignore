@@ -1,0 +1,7 @@
+.aptos/
+.movement/
+.aptos/config.yaml
+.aptos/config.yaml.local
+.aptos/config.yaml.test
+.aptos/config.yaml.testnet
+build/
