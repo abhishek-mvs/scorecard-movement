@@ -14,6 +14,8 @@ module scorecard::game_tests {
 
     // Use your actual account address from .movement/config.yaml but with 0x prefix
     const SCORECARD_ADDR: address = @0x0036504fe53f73d9ab25c6a6fbb6c003c682bea34131dcc94f607dd6839b2103;
+    const TEST_TIMESTAMP: u64 = 1234567890;
+    const ONE_DAY_IN_SECONDS: u64 = 86400;
 
     #[test]
     fun test_initialize() {
@@ -153,5 +155,36 @@ module scorecard::game_tests {
         let entry = vector::borrow(&leaderboard, 0);
         let (addr, score, _timestamp) = game::get_score_entry(entry);
         assert!(score == 100, 117);
+    }
+    
+    #[test]
+    fun test_daily_leaderboard() {
+        // Create the scorecard signer and initialize
+        let scorecard = create_test_signer(SCORECARD_ADDR);
+        game::initialize(&scorecard);
+        
+        // Create a player
+        let player = create_test_signer(@0x123);
+        
+        // Base timestamp (represents today)
+        let today_timestamp = TEST_TIMESTAMP;
+        
+        // Yesterday's timestamp
+        let yesterday_timestamp = today_timestamp - ONE_DAY_IN_SECONDS;
+        
+        // Submit scores from different days
+        game::submit_score_test_only(&player, 50, today_timestamp); // Today
+        game::submit_score_test_only(&player, 80, today_timestamp + 3600); // Today, 1 hour later
+        game::submit_score_test_only(&player, 30, yesterday_timestamp); // Yesterday
+        game::submit_score_test_only(&player, 95, yesterday_timestamp + 3600); // Yesterday, 1 hour later
+        
+        // Check daily leaderboard - should only have today's scores
+        let daily_leaderboard = game::get_daily_leaderboard_test_only(today_timestamp);
+        assert!(vector::length(&daily_leaderboard) == 2, 118);
+        
+        // First entry should be highest score from today (80)
+        let entry = vector::borrow(&daily_leaderboard, 0);
+        let (_addr, score, _timestamp) = game::get_score_entry(entry);
+        assert!(score == 80, 119);
     }
 }

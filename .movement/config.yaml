@@ -2,8 +2,8 @@
 profiles:
   default:
     network: Custom
-    private_key: "0xd11410586ec6fc1f9042cef0719ede76641bcd6e93dda751ecc295708ce01f87"
-    public_key: "0xebcfe8e9dd488c32bea699937666564dbb1796307568ae86682afab07be3c912"
-    account: 0036504fe53f73d9ab25c6a6fbb6c003c682bea34131dcc94f607dd6839b2103
+    private_key: "0xa52beb52e52283a142f029b5f5f0084d83173fb6ec265f2c195d1ae3d3c6053a"
+    public_key: "0xe42cea8924e9471d32c2fa08c88533700b0a1bbc66f518180dc49422359a2bd1"
+    account: da5c1a8dce153639093de6c95cb749f15dac969a191385407ff0ed4c98d14fa0
     rest_url: "https://aptos.testnet.bardock.movementlabs.xyz/v1"
     faucet_url: "https://faucet.testnet.bardock.movementnetwork.xyz/"
