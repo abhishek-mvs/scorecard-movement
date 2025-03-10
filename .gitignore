@@ -1,6 +1,6 @@
-.movement/
 .aptos/
+.movement/
 .aptos/config.yaml
-.aptos/data/
-.aptos/data/db/
-.aptos/data/db/
+.aptos/config.yaml.local
+.aptos/config.yaml.test
+.aptos/config.yaml.testnet
