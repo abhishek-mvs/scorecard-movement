@@ -1,0 +1,15 @@
+[package]
+name = "scorecard"
+version = "1.0.0"
+authors = []
+
+[addresses]
+scorecard="0x0036504fe53f73d9ab25c6a6fbb6c003c682bea34131dcc94f607dd6839b2103"
+[dev-addresses]
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "aptos-cli-v2.1.0"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dev-dependencies]
