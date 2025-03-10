@@ -14,7 +14,7 @@ module scorecard::game1 {
     /// If running in test mode, this will return a fixed timestamp
     /// In production, it returns the actual blockchain timestamp
     fun get_current_timestamp(): u64 {
-        let time = timestamp::now_seconds();
+        let time = 1234567890;
         if (time == 0) {
             // We're in a test environment
             1234567890

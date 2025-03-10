@@ -10,10 +10,10 @@ compiled_package_info:
     scorecard: da5c1a8dce153639093de6c95cb749f15dac969a191385407ff0ed4c98d14fa0
     std: "0000000000000000000000000000000000000000000000000000000000000001"
     vm_reserved: "0000000000000000000000000000000000000000000000000000000000000000"
-  source_digest: B45982106C1215F5B3176CC5A2D4D5AE33B4AB3EABF4C63EEB966B98B9A87389
+  source_digest: 73E7687F8559BC82376D8DE71F11EAD861898C476AB34CA4B1A90DC84D3DDE17
   build_flags:
-    dev_mode: false
-    test_mode: false
+    dev_mode: true
+    test_mode: true
     override_std: ~
     generate_docs: false
     generate_abis: false
