@@ -14,7 +14,7 @@ module scorecard::game_tests {
     }
 
     // Use your actual account address from .movement/config.yaml but with 0x prefix
-    const SCORECARD_ADDR: address = @0x0043b5060654a0a34c63a0d4cd0e871a170c23cf6aef89dad50538e7f9346089;
+    const SCORECARD_ADDR: address = @0x4fbc68c737b5ef6a6d73c5c7d13a673b3b0503ab4ed9442418b46bbcf57ee8cf;
     const TEST_TIMESTAMP: u64 = 1234567890;
     const ONE_DAY_IN_SECONDS: u64 = 86400;
 
@@ -516,5 +516,214 @@ module scorecard::game_tests {
         
         trophy_count = nft::get_trophy_count(@0x123);
         assert!(trophy_count == 0, 193);
+    }
+
+    #[test]
+    fun test_initialize_with_period() {
+        // Create the scorecard signer
+        let scorecard = create_test_signer(SCORECARD_ADDR);
+        
+        // Initialize game with a custom period (1 hour)
+        let one_hour = 3600;
+        game1::initialize_with_period(&scorecard, one_hour);
+
+        // Ensure leaderboard is empty
+        let leaderboard = game1::get_leaderboard();
+        assert!(vector::length(&leaderboard) == 0, 100);
+    }
+
+    #[test]
+    fun test_update_award_period() {
+        // Create the scorecard signer
+        let scorecard = create_test_signer(SCORECARD_ADDR);
+        
+        // Initialize game with daily period
+        game1::initialize(&scorecard);
+        
+        // Update to hourly period
+        let one_hour = 3600;
+        game1::update_award_period(&scorecard, one_hour);
+        
+        // Submit a score
+        let player = create_test_signer(@0x123);
+        game1::submit_score(&player, 50);
+        
+        // Award should work with the new period
+        game1::award_period_winner(&scorecard);
+        
+        // Check trophy count (should be 0 since we need scores from previous period)
+        let trophy_count = nft::get_trophy_count(@0x123);
+        assert!(trophy_count == 0, 101);
+    }
+
+    #[test]
+    fun test_award_period_winner() {
+        // Create the scorecard signer and initialize with a 1-hour period
+        let scorecard = create_test_signer(SCORECARD_ADDR);
+        let one_hour = 3600;
+        game1::initialize_with_period(&scorecard, one_hour);
+        
+        // Create a player
+        let player = create_test_signer(@0x123);
+        
+        // Base timestamp
+        let base_timestamp = TEST_TIMESTAMP;
+        
+        // Submit a score for the previous hour
+        let prev_hour_timestamp = base_timestamp - one_hour + 600; // 10 minutes into previous hour
+        game1::submit_score_test_only(&player, 50, prev_hour_timestamp);
+        
+        // Award the period winner
+        game1::award_period_winner(&scorecard);
+        
+        // Check trophy count
+        let trophy_count = nft::get_trophy_count(@0x123);
+        assert!(trophy_count == 1, 102);
+    }
+
+    #[test]
+    fun test_reset_game_with_period() {
+        // Create the scorecard signer and initialize
+        let scorecard = create_test_signer(SCORECARD_ADDR);
+        game1::initialize(&scorecard);
+        
+        // Create a player
+        let player = create_test_signer(@0x123);
+        
+        // Submit scores
+        game1::submit_score(&player, 50);
+        game1::submit_score(&player, 80);
+        
+        // Submit a score for yesterday
+        let yesterday_timestamp = TEST_TIMESTAMP - ONE_DAY_IN_SECONDS;
+        game1::submit_score_test_only(&player, 90, yesterday_timestamp);
+        
+        // Award the daily winner
+        game1::award_daily_winner(&scorecard);
+        
+        // Check leaderboard and trophy count
+        let leaderboard = game1::get_leaderboard();
+        assert!(vector::length(&leaderboard) == 3, 160);
+        
+        let trophy_count = nft::get_trophy_count(@0x123);
+        assert!(trophy_count == 1, 161);
+        
+        // Reset game with a new period (1 hour)
+        let one_hour = 3600;
+        game1::reset_game_with_period(&scorecard, one_hour);
+        
+        // Check leaderboard and trophy count again
+        leaderboard = game1::get_leaderboard();
+        assert!(vector::length(&leaderboard) == 0, 162);
+        
+        trophy_count = nft::get_trophy_count(@0x123);
+        assert!(trophy_count == 0, 163);
+    }
+
+    #[test]
+    fun test_reinitialize_game_with_period() {
+        // Create the scorecard signer and initialize
+        let scorecard = create_test_signer(SCORECARD_ADDR);
+        game1::initialize(&scorecard);
+        
+        // Create a player
+        let player = create_test_signer(@0x123);
+        
+        // Submit scores
+        game1::submit_score(&player, 50);
+        game1::submit_score(&player, 80);
+        
+        // Submit a score for yesterday
+        let yesterday_timestamp = TEST_TIMESTAMP - ONE_DAY_IN_SECONDS;
+        game1::submit_score_test_only(&player, 90, yesterday_timestamp);
+        
+        // Award the daily winner
+        game1::award_daily_winner(&scorecard);
+        
+        // Check leaderboard and trophy count
+        let leaderboard = game1::get_leaderboard();
+        assert!(vector::length(&leaderboard) == 3, 190);
+        
+        let trophy_count = nft::get_trophy_count(@0x123);
+        assert!(trophy_count == 1, 191);
+        
+        // Reinitialize game with a new period (1 hour)
+        let one_hour = 3600;
+        game1::reinitialize_game_with_period(&scorecard, one_hour);
+        
+        // Check leaderboard and trophy count again
+        leaderboard = game1::get_leaderboard();
+        assert!(vector::length(&leaderboard) == 0, 192);
+        
+        trophy_count = nft::get_trophy_count(@0x123);
+        assert!(trophy_count == 0, 193);
+    }
+
+    #[test]
+    fun test_multiple_award_periods() {
+        // Create the scorecard signer and initialize with a 1-hour period
+        let scorecard = create_test_signer(SCORECARD_ADDR);
+        let one_hour = 3600;
+        game1::initialize_with_period(&scorecard, one_hour);
+        
+        // Create players
+        let player1 = create_test_signer(@0x123);
+        let player2 = create_test_signer(@0x124);
+        
+        // Base timestamp
+        let base_timestamp = TEST_TIMESTAMP;
+        
+        // Submit scores for the first period (2 hours ago)
+        let period1_timestamp = base_timestamp - (2 * one_hour) + 600; // 10 minutes into period
+        game1::submit_score_test_only(&player1, 50, period1_timestamp);
+        game1::submit_score_test_only(&player2, 30, period1_timestamp + 300); // 5 minutes later
+        
+        // Submit scores for the second period (1 hour ago)
+        let period2_timestamp = base_timestamp - one_hour + 600; // 10 minutes into period
+        game1::submit_score_test_only(&player1, 20, period2_timestamp);
+        game1::submit_score_test_only(&player2, 70, period2_timestamp + 300); // 5 minutes later
+        
+        // Award for the first period (should award player1)
+        game1::award_period_winner(&scorecard);
+        
+        // Check trophy counts
+        let trophy_count1 = nft::get_trophy_count(@0x123);
+        let trophy_count2 = nft::get_trophy_count(@0x124);
+        assert!(trophy_count1 == 1, 200); // Player1 should have 1 trophy
+        assert!(trophy_count2 == 0, 201); // Player2 should have 0 trophies
+        
+        // Award for the second period (should award player2)
+        game1::award_period_winner(&scorecard);
+        
+        // Check trophy counts again
+        trophy_count1 = nft::get_trophy_count(@0x123);
+        trophy_count2 = nft::get_trophy_count(@0x124);
+        assert!(trophy_count1 == 1, 202); // Player1 should still have 1 trophy
+        assert!(trophy_count2 == 1, 203); // Player2 should now have 1 trophy
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 327685, location = scorecard::game1)]
+    fun test_award_same_period_twice() {
+        // Create the scorecard signer and initialize with a 1-hour period
+        let scorecard = create_test_signer(SCORECARD_ADDR);
+        let one_hour = 3600;
+        game1::initialize_with_period(&scorecard, one_hour);
+        
+        // Create a player
+        let player = create_test_signer(@0x123);
+        
+        // Base timestamp
+        let base_timestamp = TEST_TIMESTAMP;
+        
+        // Submit a score for the previous hour
+        let prev_hour_timestamp = base_timestamp - one_hour + 600; // 10 minutes into previous hour
+        game1::submit_score_test_only(&player, 50, prev_hour_timestamp);
+        
+        // Award the period winner
+        game1::award_period_winner(&scorecard);
+        
+        // Try to award again for the same period - should fail with E_ALREADY_REWARDED
+        game1::award_period_winner(&scorecard);
     }
 }
