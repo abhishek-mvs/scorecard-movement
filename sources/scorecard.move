@@ -4,17 +4,21 @@ module scorecard::game1 {
     use std::vector;
     use aptos_std::smart_vector;  // If needed for view attribute support
     use std::timestamp; 
+    use scorecard::nft;
     
     /// Errors
     const E_UNAUTHORIZED: u64 = 1;
     const E_ALREADY_INITIALIZED: u64 = 2;
     const E_NOT_INITIALIZED: u64 = 3;
     const E_INVALID_SCORE: u64 = 4;
+    const E_ALREADY_REWARDED: u64 = 5;
+    const E_RESET_NOT_ALLOWED: u64 = 6;
     /// Get the current timestamp
     /// If running in test mode, this will return a fixed timestamp
     /// In production, it returns the actual blockchain timestamp
     fun get_current_timestamp(): u64 {
         let time = timestamp::now_seconds();
+        /// let time = 1234567890;
         if (time == 0) {
             // We're in a test environment
             1234567890
@@ -36,6 +40,7 @@ module scorecard::game1 {
     /// Game state structure - stored at contract address
     struct GameState has key {
         scores: vector<ScoreEntry>,
+        last_reward_day: u64,  // Timestamp of the day when last reward was given
     }
     
     /// Player stats structure - stored at player's address
@@ -57,8 +62,14 @@ module scorecard::game1 {
         // Create empty scores list
         let scores = vector::empty<ScoreEntry>();
         
+        // Initialize NFT collection
+        nft::initialize_nft_collection(admin);
+        
         // Move resource to admin account
-        move_to(admin, GameState { scores });
+        move_to(admin, GameState { 
+            scores,
+            last_reward_day: 0,  // No rewards given yet
+        });
     }
     
     /// Submit a new score
@@ -233,5 +244,195 @@ module scorecard::game1 {
     #[test_only]
     public fun get_daily_leaderboard_test_only(current_time: u64): vector<ScoreEntry> acquires GameState {
         get_daily_leaderboard_internal(current_time)
+    }
+    
+    /// Award NFT to the daily top winner
+    public entry fun award_daily_winner(admin: &signer) acquires GameState {
+        let admin_addr = signer::address_of(admin);
+        
+        // Check that caller is the module publisher
+        assert!(admin_addr == @scorecard, error::permission_denied(E_UNAUTHORIZED));
+        
+        // Ensure game state is initialized
+        assert!(exists<GameState>(@scorecard), error::not_found(E_NOT_INITIALIZED));
+        
+        let current_time = get_current_timestamp();
+        let day_start = current_time - (current_time % SECONDS_PER_DAY);
+        
+        let game_state = borrow_global_mut<GameState>(@scorecard);
+        
+        // Check if we already awarded for this day
+        assert!(game_state.last_reward_day < day_start, error::already_exists(E_ALREADY_REWARDED));
+        
+        // Get yesterday's day start
+        let yesterday_start = day_start; // Use today's scores for testing
+        
+        // Find the top scorer from yesterday
+        let scores = &game_state.scores;
+        let scores_len = vector::length(scores);
+        
+        let top_score: u64 = 0;
+        let top_player: address = @0x0;
+        let found_winner = false;
+        
+        let i = 0;
+        while (i < scores_len) {
+            let entry = vector::borrow(scores, i);
+            
+            // Check if score is from yesterday
+            if (entry.timestamp >= yesterday_start && entry.timestamp < day_start) {
+                if (entry.score > top_score) {
+                    top_score = entry.score;
+                    top_player = entry.player;
+                    found_winner = true;
+                };
+            };
+            
+            i = i + 1;
+        };
+        
+        // If we found a winner, mint an NFT for them
+        if (found_winner) {
+            nft::mint_winner_nft(admin, top_player, top_score, yesterday_start);
+        };
+        
+        // Update the last reward day
+        game_state.last_reward_day = day_start;
+    }
+    
+    /// Reset the entire game state (admin only)
+    public entry fun reset_game(admin: &signer) acquires GameState {
+        let admin_addr = signer::address_of(admin);
+        
+        // Check that caller is the module publisher
+        assert!(admin_addr == @scorecard, error::permission_denied(E_UNAUTHORIZED));
+        
+        // Ensure game state is initialized
+        assert!(exists<GameState>(@scorecard), error::not_found(E_NOT_INITIALIZED));
+        
+        // Get the game state and reset it
+        let game_state = borrow_global_mut<GameState>(@scorecard);
+        
+        // Reset the scores
+        game_state.scores = vector::empty<ScoreEntry>();
+        
+        // Reset the last reward day
+        game_state.last_reward_day = 0;
+        
+        // Also reset the NFT collection
+        nft::reset_nft_collection(admin);
+    }
+    
+    /// Reset only the scores but keep NFTs (admin only)
+    public entry fun reset_scores_only(admin: &signer) acquires GameState {
+        let admin_addr = signer::address_of(admin);
+        
+        // Check that caller is the module publisher
+        assert!(admin_addr == @scorecard, error::permission_denied(E_UNAUTHORIZED));
+        
+        // Ensure game state is initialized
+        assert!(exists<GameState>(@scorecard), error::not_found(E_NOT_INITIALIZED));
+        
+        // Get the game state and reset scores only
+        let game_state = borrow_global_mut<GameState>(@scorecard);
+        
+        // Reset the scores
+        game_state.scores = vector::empty<ScoreEntry>();
+    }
+    
+    /// Reset player stats for a specific player (admin only)
+    public entry fun reset_player_stats(admin: &signer, player_addr: address) acquires PlayerStats {
+        let admin_addr = signer::address_of(admin);
+        
+        // Check that caller is the module publisher
+        assert!(admin_addr == @scorecard, error::permission_denied(E_UNAUTHORIZED));
+        
+        // Check if player stats exist
+        if (exists<PlayerStats>(player_addr)) {
+            // Get the player stats and reset them
+            let player_stats = borrow_global_mut<PlayerStats>(player_addr);
+            
+            // Reset stats
+            player_stats.best_score = 0;
+            player_stats.total_games = 0;
+        };
+    }
+    
+    /// Reinitialize the game (admin only)
+    public entry fun reinitialize_game(admin: &signer) acquires GameState {
+        let admin_addr = signer::address_of(admin);
+        
+        // Check that caller is the module publisher
+        assert!(admin_addr == @scorecard, error::permission_denied(E_UNAUTHORIZED));
+        
+        // Check if game state exists
+        if (exists<GameState>(@scorecard)) {
+            // First reset the game
+            reset_game(admin);
+        } else {
+            // Initialize from scratch
+            let scores = vector::empty<ScoreEntry>();
+            
+            // Initialize NFT collection
+            nft::initialize_nft_collection(admin);
+            
+            // Move resource to admin account
+            move_to(admin, GameState { 
+                scores,
+                last_reward_day: 0,
+            });
+        }
+    }
+    
+    /// Award NFT to the daily top winner with a specific timestamp (for testing)
+    public entry fun award_daily_winner_test(admin: &signer, future_timestamp: u64) acquires GameState {
+        let admin_addr = signer::address_of(admin);
+        
+        // Check that caller is the module publisher
+        assert!(admin_addr == @scorecard, error::permission_denied(E_UNAUTHORIZED));
+        
+        // Ensure game state is initialized
+        assert!(exists<GameState>(@scorecard), error::not_found(E_NOT_INITIALIZED));
+        
+        // Use the provided future timestamp
+        let current_time = future_timestamp;
+        let day_start = current_time - (current_time % SECONDS_PER_DAY);
+        
+        let game_state = borrow_global_mut<GameState>(@scorecard);
+        
+        // Get yesterday's day start based on the future timestamp
+        let yesterday_start = day_start - SECONDS_PER_DAY;
+        
+        // Find the top scorer from "yesterday" (which is today in real time)
+        let scores = &game_state.scores;
+        let scores_len = vector::length(scores);
+        
+        let top_score: u64 = 0;
+        let top_player: address = @0x0;
+        let found_winner = false;
+        
+        let i = 0;
+        while (i < scores_len) {
+            let entry = vector::borrow(scores, i);
+            
+            // Check if score is from "yesterday" relative to the future timestamp
+            if (entry.timestamp >= yesterday_start && entry.timestamp < day_start) {
+                if (entry.score > top_score) {
+                    top_score = entry.score;
+                    top_player = entry.player;
+                    found_winner = true;
+                };
+            };
+            
+            i = i + 1;
+        };
+        
+        // If we found a winner, mint an NFT for them
+        if (found_winner) {
+            nft::mint_winner_nft(admin, top_player, top_score, yesterday_start);
+        };
+        
+        // Update the last reward day
+        game_state.last_reward_day = day_start;
     }
 }
