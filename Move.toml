@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = []
 
 [addresses]
-scorecard="0xda5c1a8dce153639093de6c95cb749f15dac969a191385407ff0ed4c98d14fa0"
+scorecard="0x4fbc68c737b5ef6a6d73c5c7d13a673b3b0503ab4ed9442418b46bbcf57ee8cf"
 [dev-addresses]
 
 [dependencies.AptosFramework]
